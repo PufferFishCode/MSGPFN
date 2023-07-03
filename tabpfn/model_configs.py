@@ -7,6 +7,7 @@ from tabpfn.priors.differentiable_prior import replace_differentiable_distributi
 
 import ConfigSpace as CS
 
+
 def get_general_config(max_features, bptt, eval_positions=None):
     """"
     Returns the general PFN training hyperparameters.
@@ -14,7 +15,8 @@ def get_general_config(max_features, bptt, eval_positions=None):
     config_general = {
         "lr": CSH.UniformFloatHyperparameter('lr', lower=0.0001, upper=0.00015, log=True),
         "dropout": CSH.CategoricalHyperparameter('dropout', [0.0]),
-        "emsize": CSH.CategoricalHyperparameter('emsize', [2 ** i for i in range(8, 9)]), ## upper bound is -1
+        # upper bound is -1
+        "emsize": CSH.CategoricalHyperparameter('emsize', [2 ** i for i in range(8, 9)]),
         "batch_size": CSH.CategoricalHyperparameter('batch_size', [2 ** i for i in range(6, 8)]),
         "nlayers": CSH.CategoricalHyperparameter('nlayers', [12]),
         "num_features": max_features,
@@ -23,7 +25,8 @@ def get_general_config(max_features, bptt, eval_positions=None):
         "bptt": bptt,
         "eval_positions": None,
         "seq_len_used": bptt,
-        "sampling": 'normal',#hp.choice('sampling', ['mixed', 'normal']), # uniform
+        # hp.choice('sampling', ['mixed', 'normal']), # uniform
+        "sampling": 'normal',
         "epochs": 80,
         "num_steps": 100,
         "verbose": False,
@@ -33,6 +36,7 @@ def get_general_config(max_features, bptt, eval_positions=None):
     }
 
     return config_general
+
 
 def get_flexible_categorical_config(max_features):
     """"
@@ -47,16 +51,19 @@ def get_flexible_categorical_config(max_features):
         # "num_classes": lambda : random.randint(2, 10), "balanced": False,
         "max_num_classes": 2,
         "num_classes": 2,
-        "noise_type": CSH.CategoricalHyperparameter('noise_type', ["Gaussian"]), # NN
+        # NN
+        "noise_type": CSH.CategoricalHyperparameter('noise_type', ["Gaussian"]),
         "balanced": True,
         "normalize_to_ranking": CSH.CategoricalHyperparameter('normalize_to_ranking', [False]),
         "set_value_to_nan": CSH.CategoricalHyperparameter('set_value_to_nan', [0.5, 0.2, 0.0]),
         "normalize_by_used_features": True,
         "num_features_used":
-            {'uniform_int_sampler_f(3,max_features)': uniform_int_sampler_f(1, max_features)}
+            {'uniform_int_sampler_f(3,max_features)': uniform_int_sampler_f(
+                1, max_features)}
         # hp.choice('conv_activation', [{'distribution': 'uniform', 'min': 2.0, 'max': 8.0}, None]),
     }
     return config_flexible_categorical
+
 
 def get_diff_flex():
     """"
@@ -68,69 +75,114 @@ def get_diff_flex():
         #                                                 [{'distribution': 'uniform', 'min': 0.3, 'max': 0.9}, None]),
         # "num_categorical_features_sampler_b": {'distribution': 'uniform', 'min': 0.3, 'max': 0.9},
 
-        "output_multiclass_ordered_p": {'distribution': 'uniform', 'min': 0.0, 'max': 0.5}, #CSH.CategoricalHyperparameter('output_multiclass_ordered_p', [0.0, 0.1, 0.2]),
+        # CSH.CategoricalHyperparameter('output_multiclass_ordered_p', [0.0, 0.1, 0.2]),
+        "output_multiclass_ordered_p": {'distribution': 'uniform', 'min': 0.0, 'max': 0.5},
         "multiclass_type": {'distribution': 'meta_choice', 'choice_values': ['value', 'rank']},
     }
 
     return diff_flex
+
 
 def get_diff_gp():
     """"
     Returns the configuration parameters for a differentiable wrapper around GP.
     """
     diff_gp = {
-        'outputscale': {'distribution': 'meta_trunc_norm_log_scaled', 'max_mean': 10., 'min_mean': 0.00001, 'round': False,
+        'outputscale': {'distribution': 'meta_trunc_norm_log_scaled',
+                        'max_mean': 10.,
+                        'min_mean': 0.00001,
+                        'round': False,
                         'lower_bound': 0},
-        'lengthscale': {'distribution': 'meta_trunc_norm_log_scaled', 'max_mean': 10., 'min_mean': 0.00001, 'round': False,
+        'lengthscale': {'distribution': 'meta_trunc_norm_log_scaled',
+                        'max_mean': 10.,
+                        'min_mean': 0.00001,
+                        'round': False,
                         'lower_bound': 0},
-        'noise': {'distribution': 'meta_choice', 'choice_values': [0.00001, 0.0001, 0.01]}
+        'noise': {'distribution': 'meta_choice',
+                  'choice_values': [0.00001, 0.0001, 0.01]}
     }
 
     return diff_gp
+
 
 def get_diff_causal():
     """"
     Returns the configuration parameters for a differentiable wrapper around MLP / Causal mixture.
     """
     diff_causal = {
-        #"mix_activations": {'distribution': 'meta_choice', 'choice_values': [True, False]},
-        #"num_layers": {'distribution': 'meta_trunc_norm_log_scaled', 'max_mean': 6, 'min_mean': 1, 'round': True,
+        # "mix_activations": {'distribution': 'meta_choice', 'choice_values': [True, False]},
+        # "num_layers": {'distribution': 'meta_trunc_norm_log_scaled', 'max_mean': 6, 'min_mean': 1, 'round': True,
         #               'lower_bound': 2},
-        "num_layers": {'distribution': 'meta_gamma', 'max_alpha': 2, 'max_scale': 3, 'round': True,
+        "num_layers": {'distribution': 'meta_gamma',
+                       'max_alpha': 2,
+                       'max_scale': 3,
+                       'round': True,
                        'lower_bound': 2},
         # Better beta?
-        #"prior_mlp_hidden_dim": {'distribution': 'meta_trunc_norm_log_scaled', 'max_mean': 130, 'min_mean': 5,
+        # "prior_mlp_hidden_dim": {'distribution': 'meta_trunc_norm_log_scaled', 'max_mean': 130, 'min_mean': 5,
         #                         'round': True, 'lower_bound': 4},
-        "prior_mlp_hidden_dim": {'distribution': 'meta_gamma', 'max_alpha': 3, 'max_scale': 100, 'round': True, 'lower_bound': 4},
+        "prior_mlp_hidden_dim": {'distribution': 'meta_gamma',
+                                 'max_alpha': 3,
+                                 'max_scale': 100,
+                                 'round': True,
+                                 'lower_bound': 4},
 
-        "prior_mlp_dropout_prob": {'distribution': 'meta_beta', 'scale': 0.6, 'min': 0.1, 'max': 5.0},
-    # This mustn't be too high since activations get too large otherwise
+        "prior_mlp_dropout_prob": {'distribution':
+                                   'meta_beta',
+                                   'scale': 0.6,
+                                   'min': 0.1,
+                                   'max': 5.0},
+        # This mustn't be too high since activations get too large otherwise
 
-        "noise_std": {'distribution': 'meta_trunc_norm_log_scaled', 'max_mean': .3, 'min_mean': 0.0001, 'round': False,
+        "noise_std": {'distribution': 'meta_trunc_norm_log_scaled',
+                      'max_mean': .3,
+                      'min_mean': 0.0001,
+                      'round': False,
                       'lower_bound': 0.0},
-        "init_std": {'distribution': 'meta_trunc_norm_log_scaled', 'max_mean': 10.0, 'min_mean': 0.01, 'round': False,
-                     'lower_bound': 0.0},
-        #"num_causes": {'distribution': 'meta_trunc_norm_log_scaled', 'max_mean': 12, 'min_mean': 1, 'round': True,
-        #               'lower_bound': 1},
-        "num_causes": {'distribution': 'meta_gamma', 'max_alpha': 3, 'max_scale': 7, 'round': True,
-                                 'lower_bound': 2},
 
-        "is_causal": {'distribution': 'meta_choice', 'choice_values': [True, False]},
-        "pre_sample_weights": {'distribution': 'meta_choice', 'choice_values': [True, False]},
-        "y_is_effect": {'distribution': 'meta_choice', 'choice_values': [True, False]},
-        "sampling": {'distribution': 'meta_choice', 'choice_values': ['normal', 'mixed']},
-        "prior_mlp_activations": {'distribution': 'meta_choice_mixed', 'choice_values': [
-            torch.nn.Tanh
-            , torch.nn.Identity
-            , torch.nn.ReLU
-        ]},
-        "block_wise_dropout": {'distribution': 'meta_choice', 'choice_values': [True, False]},
-        "sort_features": {'distribution': 'meta_choice', 'choice_values': [True, False]},
-        "in_clique": {'distribution': 'meta_choice', 'choice_values': [True, False]},
-        #'pre_sample_causes': {'distribution': 'meta_choice', 'choice_values': [True, False]},
+        "init_std": {'distribution': 'meta_trunc_norm_log_scaled',
+                     'max_mean': 10.0,
+                     'min_mean': 0.01,
+                     'round': False,
+                     'lower_bound': 0.0},
+
+        # "num_causes": {'distribution': 'meta_trunc_norm_log_scaled', 'max_mean': 12, 'min_mean': 1, 'round': True,
+        #               'lower_bound': 1},
+        "num_causes": {'distribution': 'meta_gamma',
+                       'max_alpha': 3,
+                       'max_scale': 7,
+                       'round': True,
+                       'lower_bound': 2},
+
+        "is_causal": {'distribution': 'meta_choice',
+                      'choice_values': [True, False]},
+
+        "pre_sample_weights": {'distribution': 'meta_choice',
+                               'choice_values': [True, False]},
+
+        "y_is_effect": {'distribution': 'meta_choice',
+                        'choice_values': [True, False]},
+
+        "sampling": {'distribution': 'meta_choice',
+                     'choice_values': ['normal', 'mixed']},
+
+        "prior_mlp_activations": {'distribution': 'meta_choice_mixed',
+                                  'choice_values': [torch.nn.Tanh, torch.nn.Identity, torch.nn.ReLU]},
+
+        "block_wise_dropout": {'distribution': 'meta_choice',
+                               'choice_values': [True, False]},
+
+        "sort_features": {'distribution': 'meta_choice',
+                          'choice_values': [True, False]},
+
+        "in_clique": {'distribution': 'meta_choice',
+                      'choice_values': [True, False]},
+
+        # 'pre_sample_causes': {'distribution': 'meta_choice', 'choice_values': [True, False]},
     }
 
     return diff_causal
+
 
 def get_diff_prior_bag():
     """"
@@ -143,6 +195,7 @@ def get_diff_prior_bag():
 
     return diff_prior_bag
 
+
 def get_diff_config():
     """"
     Returns the configuration parameters for a differentiable wrapper around GP and MLP / Causal mixture priors.
@@ -152,7 +205,8 @@ def get_diff_config():
     diff_gp = get_diff_gp()
     diff_flex = get_diff_flex()
 
-    config_diff = {'differentiable_hyperparameters': {**diff_prior_bag, **diff_causal, **diff_gp, **diff_flex}}
+    config_diff = {'differentiable_hyperparameters': {
+        **diff_prior_bag, **diff_causal, **diff_gp, **diff_flex}}
 
     return config_diff
 
@@ -177,10 +231,11 @@ def get_prior_config_gp(max_features=100):
 
     config_diff = get_diff_config()
 
-    config = {**config_general_real_world, **config_flexible_categorical_real_world, **config_diff, **config_gp}
+    config = {**config_general_real_world, **
+              config_flexible_categorical_real_world, **config_diff, **config_gp}
 
     config['differentiable_hyperparameters']['prior_bag_exp_weights_1'] = {'distribution': 'uniform', 'min': 0.0,
-                                                                                  'max': .01}  # Never select MLP
+                                                                           'max': .01}  # Never select MLP
 
 
 def get_prior_config_bnn(max_features=100):
@@ -199,8 +254,8 @@ def get_prior_config_bnn(max_features=100):
               **config_mlp}
 
     config['differentiable_hyperparameters']['prior_bag_exp_weights_1'] = {'distribution': 'uniform',
-                                                                                  'min': 1000.0,
-                                                                                  'max': 1001.0}  # Always select MLP
+                                                                           'min': 1000.0,
+                                                                           'max': 1001.0}  # Always select MLP
 
 
 def get_prior_config_causal(max_features=100):
@@ -239,6 +294,7 @@ def sample_differentiable(config):
 
     return result
 
+
 def list_all_hps_in_nested(config):
     """"
     Returns a list of hyperparameters from a neszed dict of hyperparameters.
@@ -254,11 +310,13 @@ def list_all_hps_in_nested(config):
     else:
         return []
 
+
 def create_configspace_from_hierarchical(config):
     cs = CS.ConfigurationSpace()
     for hp in list_all_hps_in_nested(config):
         cs.add_hyperparameter(hp)
     return cs
+
 
 def fill_in_configsample(config, configsample):
     # config is our dict that defines config distribution
@@ -268,7 +326,8 @@ def fill_in_configsample(config, configsample):
         if isinstance(v, CSH.Hyperparameter):
             hierarchical_configsample[k] = configsample[v.name]
         elif isinstance(v, dict):
-            hierarchical_configsample[k] = fill_in_configsample(v, configsample)
+            hierarchical_configsample[k] = fill_in_configsample(
+                v, configsample)
     return hierarchical_configsample
 
 
