@@ -192,6 +192,7 @@ def get_prior_config_gp(gp_config, max_features=100):
               config_flexible_categorical_real_world, **config_diff, **config_gp}
     config['differentiable_hyperparameters']['prior_bag_exp_weights_1'] = {'distribution': 'uniform', 'min': 0.0,
                                                                            'max': .01}  # Never select MLP
+    return config
 
 
 # In[11]:
@@ -215,6 +216,7 @@ def get_prior_config_bnn(bnn_config, max_features=100):
     config['differentiable_hyperparameters']['prior_bag_exp_weights_1'] = {'distribution': 'uniform',
                                                                            'min': 1000.0,
                                                                            'max': 1001.0}  # Always select MLP
+    return config
 
 
 # In[12]:
@@ -278,8 +280,8 @@ def get_diff_causal(num_layers_max_alpha=2,
         # "num_layers": {'distribution': 'meta_trunc_norm_log_scaled', 'max_mean': 6, 'min_mean': 1, 'round': True,
         #               'lower_bound': 2},
         "num_layers": {'distribution': 'meta_gamma',
-                       'max_alpha': 2,
-                       'max_scale': 3,
+                       'max_alpha': num_layers_max_alpha,
+                       'max_scale': num_layers_max_scale,
                        'round': True,
                        'lower_bound': 2},
         # Better beta?
@@ -356,10 +358,8 @@ def get_diff_causal(num_layers_max_alpha=2,
 
 def get_diff_gp(os_max_mean=10,
                 os_min_mean=0.00001,
-                os_lower_bound=0, 
                 ls_max_mean=10, 
                 ls_min_mean=0.00001, 
-                ls_lower_bound=0,
                 noise_choices = [0.00001, 0.0001, 0.01]):
     """"
     Returns the configuration parameters for a differentiable wrapper around GP.
@@ -369,12 +369,12 @@ def get_diff_gp(os_max_mean=10,
                         'max_mean': os_max_mean,
                         'min_mean': os_min_mean,
                         'round': False,
-                        'lower_bound': os_lower_bound},
+                        'lower_bound': 0},
         'lengthscale': {'distribution': 'meta_trunc_norm_log_scaled',
                         'max_mean': ls_max_mean,
                         'min_mean': ls_min_mean,
                         'round': False,
-                        'lower_bound': ls_lower_bound},
+                        'lower_bound': 0},
         'noise': {'distribution': 'meta_choice',
                   'choice_values': noise_choices}
     }
@@ -484,14 +484,14 @@ def get_diff_config(prior_bag_config = None, causal_config=None, gp_config = Non
     # --------------------------------------------------
     if gp_config == None:
         diff_gp = get_diff_gp()
+        print(f"get diff config: gp_config is None")
     else: 
-        diff_gp = get_diff_gp(gp_config["os_max_mean"],
-                gp_config["os_min_mean"],
-                gp_config["os_lower_bound"], 
-                gp_config["ls_max_mean"], 
-                gp_config["ls_min_mean"], 
-                gp_config["ls_lower_bound"],
-                gp_config["noise_choices"])
+        print(f"get diff config: gp_config is not None")
+        diff_gp = get_diff_gp(os_max_mean= gp_config["os_max_mean"],
+                            os_min_mean=gp_config["os_min_mean"], 
+                            ls_max_mean=gp_config["ls_max_mean"], 
+                            ls_min_mean=gp_config["ls_min_mean"], 
+                            noise_choices=gp_config["noise_choices"])
         
     # --------------------------------------------------
     if flex_config == None:
@@ -515,7 +515,7 @@ def reload_config(config_type='causal',
                   bnn_config=None, 
                   task_type='multiclass', 
                   longer=0):
-    
+    print(f"{gp_config} --- 1")
     config = get_prior_config(config_type=config_type, 
                               causal_config=causal_config,
                               gp_config=gp_config,
@@ -605,38 +605,45 @@ def evaluate_hypers(config, sample_diff_hps=False):
 # In[24]:
 
 
-def sample_gp_config_meta(number_of_configs = 1):
-    config_space = CS.ConfigurationSpace()
-    
-    os_max_mean = CSH.NormalFloatHyperparameter('os_max_mean', mu=10., sigma=0.2, log=False)#?? todo
-    os_min_mean = CSH.NormalFloatHyperparameter('os_min_mean', mu=0.00001, sigma=0.2, log=False)#?? todo
-    ls_max_mean = CSH.NormalFloatHyperparameter('ls_max_mean', mu=10., sigma=0.2, log=False)#?? todo
-    ls_min_mean = CSH.NormalFloatHyperparameter('ls_min_mean', mu=0.00001, sigma=0.2, log=False)#?? todo
-    noise_choices = CSH.CategoricalHyperparameter("noise_choices", choices=[0.00001, 0.0001, 0.01]) #?? todo
-    
-    config_space.add_hyperparameters([os_max_mean, os_min_mean, ls_max_mean, ls_min_mean, noise_choices])
-    config_space_samples =config_space.sample_configuration(number_of_configs) 
-    
-    # cast to list if only one configuration to handle it everytime equally
-    config_space_samples = [config_space_samples] if number_of_configs <= 1 else config_space_samples
-    
-    results = []
-    for config_space_sample in config_space_samples:
-        config_space_sample = config_space_sample.get_dictionary()
-        config_space_sample['ls_lower_bound'] = 0
-        results.append(config_space_sample)
-    
+def sample_gp_config_meta():
+    ## Sathya
+    #result = {"os_max_mean": 6, 
+    #            "os_min_mean":0.001, 
+    #            "ls_max_mean":6,
+    #            "ls_min_mean":0.0001,
+    #            "noise_choices":[0.0001, 0.001, 0.1],
+    #            }
+    #
+    # # 
+    #Magnus
+    results = {"os_max_mean": 10, 
+                "os_min_mean":2, 
+                "ls_max_mean":12,
+                "ls_min_mean":4,
+                "noise_choices":[0.0001, 0.0001, 0.001]}
+    # 
+    #  
+    # Jack
+    # results = {"os_max_mean": 15, 
+    #             "os_min_mean":0.0001, 
+    #             "ls_max_mean":12,
+    #             "ls_min_mean":0.0001,
+    #             "noise_choices":[0.0001, 0.0001, 0.001, 0.01, 0.1],
+    #             
+    # }
+    #     
+    # Ali
+    # results = {"os_max_mean": 3, 
+    #             "os_min_mean":0.0001, 
+    #             "ls_max_mean":4,
+    #             "ls_min_mean":0.0001,
+    #             "noise_choices":[0.0001, 0.0001, 0.001, 0.01, 0.1],
+    #            
+    # }
     return results
 
 
 # In[25]:
-
-
-def sample_prior_bag_config_meta(number_of_configs = 1):
-    pass # todo
-
-
-# In[26]:
 
 
 def sample_causal_config_meta(number_of_configs = 1):
@@ -689,93 +696,65 @@ def sample_causal_config_meta(number_of_configs = 1):
                      
 
 
-# In[30]:
-
-
-NUMBER_OF_MODELS=1
-
-causal_configs = sample_causal_config_meta(number_of_configs=NUMBER_OF_MODELS) if False else None
-bnn_config = None
-gp_configs = sample_gp_config_meta(number_of_configs=NUMBER_OF_MODELS) if False else None
-
-
-for model in range(NUMBER_OF_MODELS):
-    
-    causal_config = causal_configs[model] if causal_configs else None
-    gp_config = gp_configs[model] if gp_configs else None
-    
-    config, model_string = reload_config(longer=1,
-                                         causal_config=causal_config, 
-                                         gp_config=gp_config, 
-                                         bnn_config = bnn_config)
-
-    config['bptt_extra_samples'] = None
-
-    # diff
-    config['output_multiclass_ordered_p'] = 0.
-    del config['differentiable_hyperparameters']['output_multiclass_ordered_p']
-
-    config['multiclass_type'] = 'rank'
-    del config['differentiable_hyperparameters']['multiclass_type']
-
-    config['sampling'] = 'normal' # vielleicht schlecht?
-    del config['differentiable_hyperparameters']['sampling']
-
-    config['pre_sample_causes'] = True
-    # end diff
-
-    config['multiclass_loss_type'] = 'nono' # 'compatible'
-    config['normalize_to_ranking'] = False # False
-
-    config['categorical_feature_p'] = .2 # diff: .0
-
-    # turn this back on in a random search!?
-    config['nan_prob_no_reason'] = .0
-    config['nan_prob_unknown_reason'] = .0 # diff: .0
-    config['set_value_to_nan'] = .1 # diff: 1.
-
-    config['normalize_with_sqrt'] = False
-
-    config['new_mlp_per_example'] = True
-    config['prior_mlp_scale_weights_sqrt'] = True
-    config['batch_size_per_gp_sample'] = None
-
-    config['normalize_ignore_label_too'] = False
-
-    config['differentiable_hps_as_style'] = False
-    config['max_eval_pos'] = 1000
-
-    config['random_feature_rotation'] = True
-    config['rotate_normalized_labels'] = True
-
-    config["mix_activations"] = False # False heisst eig True
-
-    config['emsize'] = 512
-    config['nhead'] = config['emsize'] // 128
-    config['bptt'] = 1024+128
-    config['canonical_y_encoder'] = False
-
-
-    config['aggregate_k_gradients'] = 8
-    config['batch_size'] = 8*config['aggregate_k_gradients']
-    config['num_steps'] = 1024//config['aggregate_k_gradients']
-    config['epochs'] = 400
-    config['total_available_time_in_s'] = None #60*60*22 # 22 hours for some safety...
-
-    config['train_mixed_precision'] = True
-    config['efficient_eval_masking'] = True
-
-    #print_config(config)
-    config_sample = evaluate_hypers(config)
-    config_sample['batch_size'] = 4
-    # print_config(config_sample)
-    if False: 
-        model = get_model(config_sample, device, should_train=True, verbose=0)
-        save_model(model, base_path, f'baseline_model_400_epochs.cpkt', config_sample)
-
-
 # In[ ]:
 
 
+causal_configs = sample_causal_config_meta() if False else None
+bnn_config = None
+gp_configs = sample_gp_config_meta() 
 
+
+causal_config = causal_configs if causal_configs else None
+gp_config = gp_configs if gp_configs else None
+
+config, model_string = reload_config(config_type='gp',
+                                     longer=1,
+                                     causal_config=causal_config, 
+                                     gp_config=gp_config, 
+                                     bnn_config = bnn_config)
+config['bptt_extra_samples'] = None
+# diff
+config['output_multiclass_ordered_p'] = 0.
+del config['differentiable_hyperparameters']['output_multiclass_ordered_p']
+config['multiclass_type'] = 'rank'
+del config['differentiable_hyperparameters']['multiclass_type']
+config['sampling'] = 'normal' # vielleicht schlecht?
+del config['differentiable_hyperparameters']['sampling']
+config['pre_sample_causes'] = True
+# end diff
+config['multiclass_loss_type'] = 'nono' # 'compatible'
+config['normalize_to_ranking'] = False # False
+config['categorical_feature_p'] = .2 # diff: .0
+# turn this back on in a random search!?
+config['nan_prob_no_reason'] = .0
+config['nan_prob_unknown_reason'] = .0 # diff: .0
+config['set_value_to_nan'] = .1 # diff: 1.
+config['normalize_with_sqrt'] = False
+config['new_mlp_per_example'] = True
+config['prior_mlp_scale_weights_sqrt'] = True
+config['batch_size_per_gp_sample'] = None
+config['normalize_ignore_label_too'] = False
+config['differentiable_hps_as_style'] = False
+config['max_eval_pos'] = 1000
+config['random_feature_rotation'] = True
+config['rotate_normalized_labels'] = True
+config["mix_activations"] = False # False heisst eig True
+config['emsize'] = 512
+config['nhead'] = config['emsize'] // 128
+config['bptt'] = 1024+128
+config['canonical_y_encoder'] = False
+config['aggregate_k_gradients'] = 8
+config['batch_size'] = 8*config['aggregate_k_gradients']
+config['num_steps'] = 1024//config['aggregate_k_gradients']
+config['epochs'] = 400
+config['total_available_time_in_s'] = None #60*60*22 # 22 hours for some safety...
+config['train_mixed_precision'] = True
+config['efficient_eval_masking'] = True
+#print_config(config)
+config_sample = evaluate_hypers(config)
+config_sample['batch_size'] = 4
+# print_config(config_sample)
+if True: 
+    model = get_model(config_sample, device, should_train=True, verbose=0)
+    save_model(model, base_path, f'baseline_model_gp_1.cpkt', config_sample)
 
