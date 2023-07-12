@@ -58,11 +58,11 @@ def load_model_workflow(i, e, add_name, base_path, device='cpu', eval_addition='
         """
         Returns the different paths of model_file, model_path and results_file
         """
-        model_file = f'models_diff/prior_diff_real_checkpoint{add_name}_n_{i}_epoch_{1}.cpkt'
+        model_file = f'{add_name}.cpkt'
         model_path = os.path.join(base_path, model_file)
         # print('Evaluate ', model_path)
         results_file = os.path.join(base_path,
-                                    f'models_diff/prior_diff_real_results{add_name}_n_{i}_epoch_{e}_{eval_addition}.pkl')
+                                    f'prior_diff_real_results{add_name}_n_{i}_epoch_{e}_{eval_addition}.pkl')
         return model_file, model_path, results_file
 
     def check_file(e):
