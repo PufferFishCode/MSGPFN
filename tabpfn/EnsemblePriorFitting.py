@@ -31,7 +31,6 @@
 
 #%autoreload 2
 
-
 # In[2]:
 
 
@@ -66,7 +65,6 @@ from tabpfn.priors.differentiable_prior import replace_differentiable_distributi
 from ConfigSpace import hyperparameters as CSH
 import ConfigSpace as CS
 
-
 # In[3]:
 
 
@@ -75,14 +73,12 @@ max_samples = 10000 if large_datasets else 5000
 bptt = 10000 if large_datasets else 3000
 suite='cc'
 
-
 # In[4]:
 
 
-device = 'cpu'
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 base_path = '.'
 max_features = 100
-
 
 # In[5]:
 
@@ -96,7 +92,6 @@ def print_models(model_string):
             if exists:
                 print(os.path.join(base_path, f'models_diff/prior_diff_real_checkpoint{model_string}_n_{i}_epoch_{e}.cpkt'))
         print()
-
 
 # In[6]:
 
@@ -123,7 +118,6 @@ def train_function(config_sample, i, add_name=''):
     
     return
 
-
 # In[7]:
 
 
@@ -149,6 +143,10 @@ def get_prior_config(config_type, causal_config = None, gp_config = None, bnn_co
         return get_prior_config_gp(gp_config=gp_config)
     elif config_type == 'bnn':
         return get_prior_config_bnn(bnn_config=bnn_config)
+    elif config_type == 'prior_bag':
+        config_causal = get_prior_config_causal(causal_config=causal_config)
+        config_gp = get_prior_config_gp(gp_config=gp_config)
+        return {**config_causal, **config_gp}
 
 
 # In[9]:
@@ -194,8 +192,7 @@ def get_prior_config_gp(gp_config, max_features=100):
                                                                            'max': .01}  # Never select MLP
     return config
 
-
-# In[11]:
+# In[44]:
 
 
 def get_prior_config_bnn(bnn_config, max_features=100):
@@ -217,7 +214,6 @@ def get_prior_config_bnn(bnn_config, max_features=100):
                                                                            'min': 1000.0,
                                                                            'max': 1001.0}  # Always select MLP
     return config
-
 
 # In[12]:
 
@@ -259,6 +255,7 @@ def get_general_config(max_features, bptt, eval_positions=None):
 # In[13]:
 
 
+
 def get_diff_causal(num_layers_max_alpha=2,
                     num_layers_max_scale=3,
                     prior_mlp_hidden_dim_max_alpha=3,
@@ -288,35 +285,35 @@ def get_diff_causal(num_layers_max_alpha=2,
         # "prior_mlp_hidden_dim": {'distribution': 'meta_trunc_norm_log_scaled', 'max_mean': 130, 'min_mean': 5,
         #                         'round': True, 'lower_bound': 4},
         "prior_mlp_hidden_dim": {'distribution': 'meta_gamma',
-                                 'max_alpha': 3,
-                                 'max_scale': 100,
+                                 'max_alpha': prior_mlp_hidden_dim_max_alpha,
+                                 'max_scale': prior_mlp_hidden_dim_max_scale,
                                  'round': True,
                                  'lower_bound': 4},
 
         "prior_mlp_dropout_prob": {'distribution':
                                    'meta_beta',
-                                   'scale': 0.6,
-                                   'min': 0.1,
-                                   'max': 5.0},
+                                   'scale': prior_mlp_dropout_prob_scale,
+                                   'min': prior_mlp_dropout_prob_min,
+                                   'max': prior_mlp_dropout_prob_max},
         # This mustn't be too high since activations get too large otherwise
 
         "noise_std": {'distribution': 'meta_trunc_norm_log_scaled',
-                      'max_mean': .3,
-                      'min_mean': 0.0001,
+                      'max_mean': noise_std_max_mean,
+                      'min_mean': noise_std_min_mean,
                       'round': False,
                       'lower_bound': 0.0},
 
         "init_std": {'distribution': 'meta_trunc_norm_log_scaled',
-                     'max_mean': 10.0,
-                     'min_mean': 0.01,
+                     'max_mean': init_std_max_mean,
+                     'min_mean': init_std_min_mean,
                      'round': False,
                      'lower_bound': 0.0},
 
         # "num_causes": {'distribution': 'meta_trunc_norm_log_scaled', 'max_mean': 12, 'min_mean': 1, 'round': True,
         #               'lower_bound': 1},
         "num_causes": {'distribution': 'meta_gamma',
-                       'max_alpha': 3,
-                       'max_scale': 7,
+                       'max_alpha': num_causes_max_alpha,
+                       'max_scale': num_causes_max_scale,
                        'round': True,
                        'lower_bound': 2},
 
@@ -416,6 +413,7 @@ def get_flexible_categorical_config(max_features):
 # In[16]:
 
 
+
 def get_diff_flex():
     """"
     Returns the configuration parameters for a differentiable wrapper around the tabular multiclass wrapper.
@@ -447,7 +445,6 @@ def get_diff_prior_bag(dist_type="uniform", weights_min=2.0, weights_max=10.0):
     }
 
     return diff_prior_bag
-
 
 # In[18]:
 
@@ -484,9 +481,7 @@ def get_diff_config(prior_bag_config = None, causal_config=None, gp_config = Non
     # --------------------------------------------------
     if gp_config == None:
         diff_gp = get_diff_gp()
-        print(f"get diff config: gp_config is None")
     else: 
-        print(f"get diff config: gp_config is not None")
         diff_gp = get_diff_gp(os_max_mean= gp_config["os_max_mean"],
                             os_min_mean=gp_config["os_min_mean"], 
                             ls_max_mean=gp_config["ls_max_mean"], 
@@ -505,8 +500,7 @@ def get_diff_config(prior_bag_config = None, causal_config=None, gp_config = Non
 
     return config_diff
 
-
-# In[19]:
+# In[45]:
 
 
 def reload_config(config_type='causal',
@@ -514,15 +508,25 @@ def reload_config(config_type='causal',
                   gp_config=None,
                   bnn_config=None, 
                   task_type='multiclass', 
-                  longer=0):
-    print(f"{gp_config} --- 1")
+                  longer=0): 
     config = get_prior_config(config_type=config_type, 
                               causal_config=causal_config,
                               gp_config=gp_config,
                               bnn_config= bnn_config) 
+
     
-    config['prior_type'], config['differentiable'], config['flexible'] = 'prior_bag', True, True
+    print(f'config_type: {config_type}')
+    prior_type_dict = {
+        'causal': 'mlp',
+        'bnn': 'mlp',
+        'gp': 'gp',
+        'prior_bag': 'prior_bag'
+    }
+
+    config['prior_type'], config['differentiable'], config['flexible'] = prior_type_dict[config_type], True, True
     
+    # print_config(config)
+
     model_string = ''
     
     config['epochs'] = 12000
@@ -536,7 +540,6 @@ def reload_config(config_type='causal',
     model_string = model_string + '_'+datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
     
     return config, model_string
-
 
 # # Sample Hyperparameters for Priors
 
@@ -558,7 +561,6 @@ def list_all_hps_in_nested(config):
     else:
         return []
 
-
 # In[21]:
 
 
@@ -567,7 +569,6 @@ def create_configspace_from_hierarchical(config):
     for hp in list_all_hps_in_nested(config):
         cs.add_hyperparameter(hp)
     return cs
-
 
 # In[22]:
 
@@ -582,7 +583,6 @@ def fill_in_configsample(config, configsample):
         elif isinstance(v, dict):
             hierarchical_configsample[k] = fill_in_configsample(v, configsample)
     return hierarchical_configsample
-
 
 # In[23]:
 
@@ -616,21 +616,20 @@ def sample_gp_config_meta():
     #
     # # 
     #Magnus
-    results = {"os_max_mean": 10, 
-                "os_min_mean":2, 
-                "ls_max_mean":12,
-                "ls_min_mean":4,
-                "noise_choices":[0.0001, 0.0001, 0.001]}
+    #results = {"os_max_mean": 10, 
+    #            "os_min_mean":2, 
+    #            "ls_max_mean":12,
+    #            "ls_min_mean":4,
+    #            "noise_choices":[0.0001, 0.0001, 0.001]}
     # 
     #  
     # Jack
-    # results = {"os_max_mean": 15, 
-    #             "os_min_mean":0.0001, 
-    #             "ls_max_mean":12,
-    #             "ls_min_mean":0.0001,
-    #             "noise_choices":[0.0001, 0.0001, 0.001, 0.01, 0.1],
-    #             
-    # }
+    results = {"os_max_mean": 18, 
+                 "os_min_mean":0.0001, 
+                 "ls_max_mean":12,
+                 "ls_min_mean":0.0001,
+                 "noise_choices":[0.0001, 0.0001, 0.001, 0.01, 0.1]    
+    }
     #     
     # Ali
     # results = {"os_max_mean": 3, 
@@ -642,72 +641,38 @@ def sample_gp_config_meta():
     # }
     return results
 
-
 # In[25]:
 
 
 def sample_causal_config_meta(number_of_configs = 1):
-    config_space = CS.ConfigurationSpace()
-
-    num_layers_max_alpha = CSH.NormalFloatHyperparameter('num_layers_max_alpha', mu=2., sigma=0.2, log=False)#?? todo
-    num_layers_max_scale = CSH.NormalFloatHyperparameter('num_layers_max_scale', mu=3, sigma=0.2, log=False)#?? todo
-    
-    prior_mlp_hidden_dim_max_alpha = CSH.NormalFloatHyperparameter('prior_mlp_hidden_dim_max_alpha', mu=3, sigma=0.2, log=False)#?? todo
-    prior_mlp_hidden_dim_max_scale = CSH.NormalFloatHyperparameter('prior_mlp_hidden_dim_max_scale', mu=100, sigma=0.2, log=False)#?? todo
-    
-    prior_mlp_dropout_prob_scale = CSH.NormalFloatHyperparameter('prior_mlp_dropout_prob_scale', mu=0.6, sigma=0.2, log=False)#?? todo
-    prior_mlp_dropout_prob_min = CSH.NormalFloatHyperparameter('prior_mlp_dropout_prob_min', mu=0.1, sigma=0.2, log=False)#?? todo
-    prior_mlp_dropout_prob_max = CSH.NormalFloatHyperparameter('prior_mlp_dropout_prob_max', mu=5, sigma=0.2, log=False)#?? todo
-    
-    noise_std_max_mean = CSH.NormalFloatHyperparameter('noise_std_max_mean', mu=0.3, sigma=0.2, log=False)#?? todo
-    noise_std_min_mean = CSH.NormalFloatHyperparameter('noise_std_min_mean', mu=0.0001, sigma=0.2, log=False)#?? todo
-    
-    init_std_max_mean = CSH.NormalFloatHyperparameter('init_std_max_mean', mu=10.0, sigma=0.2, log=False)#?? todo
-    init_std_min_mean = CSH.NormalFloatHyperparameter('init_std_min_mean', mu=0.01, sigma=0.2, log=False)#?? todo
-    
-    num_causes_max_alpha = CSH.NormalFloatHyperparameter('num_causes_max_alpha', mu=3, sigma=0.2, log=False)#?? todo
-    num_causes_max_scale = CSH.NormalFloatHyperparameter('num_causes_max_scale', mu=7, sigma=0.2, log=False)#?? todo
-
-    config_space.add_hyperparameters([num_layers_max_alpha, 
-                                      num_layers_max_scale, 
-                                      prior_mlp_hidden_dim_max_alpha, 
-                                      prior_mlp_hidden_dim_max_scale, 
-                                      prior_mlp_dropout_prob_scale, 
-                                      prior_mlp_dropout_prob_min, 
-                                      prior_mlp_dropout_prob_max, 
-                                      noise_std_max_mean, 
-                                      noise_std_min_mean, 
-                                      init_std_max_mean, 
-                                      init_std_min_mean,
-                                      num_causes_max_alpha, 
-                                      num_causes_max_scale])
-    
-    config_space_samples =config_space.sample_configuration(number_of_configs) 
-    
-    # cast to list if only one configuration to handle it everytime equally
-    config_space_samples = [config_space_samples] if number_of_configs <= 1 else config_space_samples
-    
-    results = []
-    for config_space_sample in config_space_samples:
-        config_space_sample = config_space_sample.get_dictionary()
-        results.append(config_space_sample)
-    
-    return results
+        
+        return {"num_layers_max_alpha":2,
+                    "num_layers_max_scale":3,
+                    "prior_mlp_hidden_dim_max_alpha":3,
+                    "prior_mlp_hidden_dim_max_scale":100,
+                    "prior_mlp_dropout_prob_scale":0.6,
+                    "prior_mlp_dropout_prob_min":0.1,
+                    "prior_mlp_dropout_prob_max":5.0,
+                    "noise_std_max_mean":0.3,
+                    "noise_std_min_mean":0.0001, 
+                    "init_std_max_mean":10.0,
+                    "init_std_min_mean":0.01,
+                    "num_causes_max_alpha":3, 
+                    "num_causes_max_scale":7}
                      
 
+# In[57]:
 
-# In[ ]:
 
 
-causal_configs = sample_causal_config_meta() if False else None
+
+causal_config = None # sample_causal_config_meta()  
+gp_config = sample_gp_config_meta()
 bnn_config = None
-gp_configs = sample_gp_config_meta() 
 
 
-causal_config = causal_configs if causal_configs else None
-gp_config = gp_configs if gp_configs else None
 
-config, model_string = reload_config(config_type='gp',
+config, model_string = reload_config(config_type='gp', # 'gp', 'causal', 'prior_bag' 'bnn' but bnn is broken
                                      longer=1,
                                      causal_config=causal_config, 
                                      gp_config=gp_config, 
@@ -750,11 +715,11 @@ config['epochs'] = 400
 config['total_available_time_in_s'] = None #60*60*22 # 22 hours for some safety...
 config['train_mixed_precision'] = True
 config['efficient_eval_masking'] = True
-#print_config(config)
+print_config(config)
 config_sample = evaluate_hypers(config)
 config_sample['batch_size'] = 4
 # print_config(config_sample)
 if True: 
-    model = get_model(config_sample, device, should_train=True, verbose=0)
-    save_model(model, base_path, f'baseline_model_gp_1.cpkt', config_sample)
+    model = get_model(config_sample, device, should_train=True, verbose=1)
+    save_model(model[2], base_path, f'baseline_model_causal_1.cpkt', config_sample)
 
