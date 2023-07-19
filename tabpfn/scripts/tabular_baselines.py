@@ -253,6 +253,20 @@ def transformer_metric(x, y, test_x, test_y, cat_features, metric_used, max_time
 
     return metric, pred, None
 
+## transformer ensemble method
+def ensemble_transformer_metric(x, y, test_x, test_y, cat_features, metric_used, max_time=300, device='cpu', N_ensemble_configurations=3, classifier=None):
+    from tabpfn.scripts.transformer_prediction_interface import PFNEnsembleClassifier
+
+    if classifier is None:
+      classifier = PFNEnsembleClassifier(device=device, N_ensemble_configurations=N_ensemble_configurations)
+    classifier.fit(x, y)
+    print('Train data shape', x.shape, ' Test data shape', test_x.shape)
+    pred = classifier.predict_proba(test_x)
+
+    metric = metric_used(test_y, pred)
+
+    return metric, pred, None
+
 ## Auto Gluon
 # WARNING: Crashes for some predictors for regression
 def autogluon_metric(x, y, test_x, test_y, cat_features, metric_used, max_time=300):
