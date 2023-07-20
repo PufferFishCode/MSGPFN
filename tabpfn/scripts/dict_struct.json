@@ -1,0 +1,32 @@
+model_dict = {
+    'gp_model_1': {
+        'model': nn.module
+        'model_auc' :
+        'model_weight' :
+    }
+    'scm_model_1':{
+        'model': nn.module
+        'model_auc' :
+        'model_weight' :
+    }
+    'bag_model_1':
+}
+
+data_ens_dict = {
+    'gp_model_1_identity': {
+        'train_data': [x , y]
+        'test_data' : x_test
+        'test_preds' : preds
+        'data_auc' :
+        'data_weight' :
+    }
+    'gp_model_1_powertransformer':{
+        'train_data': [x_t , y_t]
+        'test_data' : x_test_t
+        'data_auc' :
+        'data_weight' :
+    }
+    'bag_model_1':
+}
+
+attr of the PFNEnsemble
