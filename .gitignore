@@ -165,3 +165,4 @@ models_gp/
 temptest/
 *.cpkt
 *.pickle
+*.png
