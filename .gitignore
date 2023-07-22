@@ -164,3 +164,4 @@ models_causal/
 models_gp/
 temptest/
 *.cpkt
+*.pickle
